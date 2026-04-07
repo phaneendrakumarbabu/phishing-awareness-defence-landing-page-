@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhishGuard AI — ML-Powered Phishing Defence Extension</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #030810;
+    --surface: #07111f;
+    --panel: #0c1e30;
+    --accent: #00e5ff;
+    --accent2: #ff3b6b;
+    --accent3: #39ff14;
+    --text: #d4e8f5;
+    --muted: #5a7a8e;
+    --border: rgba(0,229,255,0.15);
+    --glow: 0 0 20px rgba(0,229,255,0.35);
+    --mono: 'Share Tech Mono', monospace;
+    --display: 'Syne', sans-serif;
+    --body-font: 'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body-font);
+    font-weight: 300;
+    overflow-x: hidden;
+  }
+
+  /* ── SCANLINES OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.04) 2px,
+      rgba(0,0,0,0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── NOISE TEXTURE ── */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 9998;
+    opacity: 0.4;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.2rem 4rem;
+    background: rgba(3,8,16,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    z-index: 1000;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-decoration: none;
+  }
+  .logo span { color: var(--accent2); }
+
+  nav ul {
+    list-style: none;
+    display: flex; gap: 2.5rem;
+  }
+  nav ul a {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: color 0.2s;
+  }
+  nav ul a:hover { color: var(--accent); }
+
+  .nav-cta {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--bg) !important;
+    background: var(--accent);
+    padding: 0.55rem 1.4rem;
+    border-radius: 2px;
+    transition: box-shadow 0.2s, opacity 0.2s !important;
+  }
+  .nav-cta:hover { box-shadow: var(--glow); opacity: 0.9; color: var(--bg) !important; }
+
+  /* ── HERO ── */
+  #hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center;
+    padding: 10rem 2rem 6rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black, transparent);
+  }
+
+  .hero-glow {
+    position: absolute;
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(0,229,255,0.08) 0%, transparent 70%);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    animation: pulse 4s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+    50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--border);
+    padding: 0.4rem 1.2rem;
+    border-radius: 100px;
+    margin-bottom: 2rem;
+    position: relative;
+    animation: fadeUp 0.8s ease both;
+    background: rgba(0,229,255,0.05);
+  }
+  .badge::before {
+    content: '';
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--accent3);
+    border-radius: 50%;
+    margin-right: 0.6rem;
+    animation: blink 1.5s step-end infinite;
+    vertical-align: middle;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(3rem, 7vw, 6rem);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.5rem;
+    position: relative;
+    animation: fadeUp 0.8s 0.1s ease both;
+  }
+  h1 em {
+    font-style: normal;
+    color: var(--accent);
+    position: relative;
+  }
+  h1 em::after {
+    content: '';
+    position: absolute;
+    bottom: -4px; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  .hero-sub {
+    font-size: 1.15rem;
+    color: var(--muted);
+    max-width: 560px;
+    line-height: 1.7;
+    margin-bottom: 3rem;
+    position: relative;
+    animation: fadeUp 0.8s 0.2s ease both;
+  }
+
+  .hero-actions {
+    display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+    position: relative;
+    animation: fadeUp 0.8s 0.3s ease both;
+  }
+
+  .btn-primary {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--bg);
+    background: var(--accent);
+    border: none;
+    padding: 0.9rem 2.2rem;
+    cursor: pointer;
+    border-radius: 2px;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    transition: box-shadow 0.25s, transform 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .btn-primary::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.4s;
+  }
+  .btn-primary:hover { box-shadow: 0 0 30px rgba(0,229,255,0.5); transform: translateY(-1px); }
+  .btn-primary:hover::before { transform: translateX(100%); }
+
+  .btn-ghost {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 0.9rem 2.2rem;
+    cursor: pointer;
+    border-radius: 2px;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    transition: border-color 0.25s, color 0.25s, box-shadow 0.25s;
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 20px rgba(0,229,255,0.05); }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── SCAN ANIMATION ── */
+  .scan-demo {
+    position: relative;
+    margin-top: 5rem;
+    width: 100%;
+    max-width: 760px;
+    animation: fadeUp 0.8s 0.5s ease both;
+  }
+
+  .scan-window {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(0,229,255,0.08), 0 40px 80px rgba(0,0,0,0.6);
+  }
+
+  .scan-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.7rem 1rem;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.r { background: #ff5f56; }
+  .dot.y { background: #ffbd2e; }
+  .dot.g { background: #27c93f; }
+  .url-bar {
+    flex: 1; background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+    border-radius: 3px; padding: 0.3rem 0.8rem;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--muted);
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .url-bar .lock { color: var(--accent2); font-size: 0.65rem; }
+
+  .scan-body {
+    padding: 1.5rem;
+    min-height: 160px;
+    position: relative;
+  }
+
+  .scan-line {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: scanMove 2.5s ease-in-out infinite;
+    box-shadow: 0 0 10px var(--accent);
+  }
+  @keyframes scanMove {
+    0% { top: 0; opacity: 1; }
+    90% { top: 100%; opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  .result-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 1rem;
+  }
+  .result-card {
+    background: rgba(0,0,0,0.3); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.9rem;
+    font-family: var(--mono); font-size: 0.72rem;
+  }
+  .result-card .label { color: var(--muted); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.1em; }
+  .result-card .value { font-size: 1.3rem; }
+  .value.safe { color: var(--accent3); }
+  .value.danger { color: var(--accent2); }
+  .value.warn { color: #ffd700; }
+
+  .threat-bar { margin-top: 1rem; }
+  .threat-bar-label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); margin-bottom: 0.4rem; display: flex; justify-content: space-between; }
+  .bar-track { background: rgba(255,255,255,0.05); border-radius: 2px; height: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 2px; animation: barLoad 2s ease forwards; }
+  .bar-fill.low { background: var(--accent3); width: 12%; }
+  .bar-fill.med { background: #ffd700; width: 45%; animation-delay: 0.3s; }
+  .bar-fill.high { background: var(--accent2); width: 87%; animation-delay: 0.6s; }
+  @keyframes barLoad { from { width: 0; } }
+
+  /* ── STATS TICKER ── */
+  .ticker {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    padding: 0.8rem 0;
+    overflow: hidden;
+    position: relative;
+  }
+  .ticker-track {
+    display: flex; gap: 4rem;
+    animation: tickerMove 25s linear infinite;
+    white-space: nowrap;
+  }
+  @keyframes tickerMove { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .ticker-item {
+    font-family: var(--mono); font-size: 0.75rem;
+    color: var(--muted); letter-spacing: 0.08em;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .ticker-item span { color: var(--accent); }
+
+  /* ── SECTIONS ── */
+  section { padding: 6rem 2rem; max-width: 1100px; margin: 0 auto; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 0.8rem;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  h2 {
+    font-family: var(--display);
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.2rem;
+  }
+
+  .section-sub {
+    color: var(--muted); font-size: 1.05rem; line-height: 1.7;
+    max-width: 520px; margin-bottom: 3.5rem;
+  }
+
+  /* ── HOW IT WORKS ── */
+  .steps {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 1.5px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .step {
+    background: var(--panel);
+    padding: 2.5rem 2rem;
+    position: relative;
+    transition: background 0.3s;
+  }
+  .step:hover { background: #0f2438; }
+
+  .step-num {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 1.2rem;
+  }
+
+  .step-icon {
+    width: 48px; height: 48px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem;
+    margin-bottom: 1.2rem;
+    background: rgba(0,229,255,0.04);
+  }
+
+  .step h3 {
+    font-family: var(--display);
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.6rem;
+  }
+
+  .step p {
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  /* ── FEATURES ── */
+  #features { padding-top: 0; }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .feature {
+    background: var(--panel);
+    padding: 2rem 2rem;
+    display: flex; gap: 1.2rem;
+    align-items: flex-start;
+    transition: background 0.3s;
+  }
+  .feature:hover { background: #0f2438; }
+
+  .feature-icon {
+    width: 40px; height: 40px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: rgba(0,229,255,0.04);
+  }
+
+  .feature h3 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .feature p { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
+
+  /* ── THREAT VISUAL ── */
+  #threat {
+    padding: 4rem 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .threat-inner {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4rem;
+    align-items: center;
+  }
+
+  .threat-stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-family: var(--display);
+    font-size: 2.4rem;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 0.4rem;
+    display: block;
+  }
+  .stat-number.red { color: var(--accent2); }
+  .stat-label { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  /* ── ML SECTION ── */
+  #ml {
+    max-width: 1100px; margin: 0 auto;
+    padding: 4rem 2rem 6rem;
+  }
+
+  .ml-inner {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 5rem; align-items: center;
+  }
+
+  .ml-visual {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+  }
+
+  .ml-header {
+    color: var(--muted); margin-bottom: 1rem;
+    display: flex; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.8rem;
+  }
+
+  .ml-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .ml-feature-name { color: var(--text); }
+  .ml-score {
+    display: flex; align-items: center; gap: 0.8rem;
+  }
+  .ml-bar { width: 80px; height: 3px; background: rgba(255,255,255,0.05); border-radius: 2px; overflow: hidden; }
+  .ml-bar-fill { height: 100%; border-radius: 2px; }
+
+  .model-badge {
+    margin-top: 1.2rem; padding: 0.8rem;
+    background: rgba(0,229,255,0.05);
+    border: 1px solid rgba(0,229,255,0.2);
+    border-radius: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .model-badge span { color: var(--accent); }
+  .confidence { color: var(--accent3); font-weight: bold; }
+
+  .tech-list { list-style: none; display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1.5rem; }
+  .tech-list li {
+    display: flex; align-items: center; gap: 0.8rem;
+    font-size: 0.9rem; color: var(--muted);
+  }
+  .tech-list li::before {
+    content: '▸';
+    color: var(--accent); font-size: 0.7rem;
+  }
+
+  /* ── CTA ── */
+  #cta {
+    text-align: center;
+    padding: 6rem 2rem 8rem;
+    max-width: 700px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  #cta::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 60% at 50% 50%, rgba(0,229,255,0.04), transparent);
+    pointer-events: none;
+  }
+
+  #cta h2 { margin-bottom: 1rem; }
+  #cta p { color: var(--muted); line-height: 1.7; margin-bottom: 2.5rem; }
+
+  .contact-grid {
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 2rem;
+    margin-top: 3rem; padding-top: 3rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .contact-item {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--muted); letter-spacing: 0.05em;
+    display: flex; align-items: center; gap: 0.5rem;
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .contact-item:hover { color: var(--accent); }
+  .contact-item .icon { font-size: 1rem; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem 4rem;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  footer p { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); }
+
+  /* ── SCROLL REVEAL ── */
+  .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.7s ease, transform 0.7s ease; }
+  .reveal.visible { opacity: 1; transform: translateY(0); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 768px) {
+    nav { padding: 1rem 1.5rem; }
+    nav ul { display: none; }
+    .steps { grid-template-columns: 1fr; }
+    .features-grid { grid-template-columns: 1fr; }
+    .threat-inner, .ml-inner { grid-template-columns: 1fr; gap: 2rem; }
+    .result-grid { grid-template-columns: 1fr; }
+    footer { flex-direction: column; gap: 1rem; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="logo" href="#">PhishGuard<span>.AI</span></a>
+  <ul>
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#ml">ML Engine</a></li>
+    <li><a href="#cta">Contact</a></li>
+  </ul>
+  <a href="https://github.com/phaneendrakumarbabu/ml-based-phishing-awareness-defence-extension" target="_blank" class="nav-cta">View on GitHub</a>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-grid"></div>
+  <div class="hero-glow"></div>
+  <div class="badge">Browser Extension · Machine Learning · Real-Time</div>
+  <h1>Stop Phishing<br>Before It <em>Catches You</em></h1>
+  <p class="hero-sub">
+    An intelligent browser extension powered by machine learning that detects, blocks, and educates users against phishing attacks — in real time.
+  </p>
+  <div class="hero-actions">
+    <a href="https://github.com/phaneendrakumarbabu/ml-based-phishing-awareness-defence-extension" target="_blank" class="btn-primary">⬇ Install Extension</a>
+    <a href="#how" class="btn-ghost">▶ See How It Works</a>
+  </div>
+
+  <!-- LIVE SCAN DEMO -->
+  <div class="scan-demo">
+    <div class="scan-window">
+      <div class="scan-bar">
+        <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+        <div class="url-bar">
+          <span class="lock">⚠</span>
+          <span id="url-text">http://secure-paypa1.verify-account.xyz/login</span>
+        </div>
+        <span style="font-family:var(--mono);font-size:0.7rem;color:var(--accent2);margin-left:0.5rem;">SCANNING</span>
+      </div>
+      <div class="scan-body">
+        <div class="scan-line"></div>
+        <div class="result-grid">
+          <div class="result-card">
+            <div class="label">Threat Level</div>
+            <div class="value danger">HIGH</div>
+          </div>
+          <div class="result-card">
+            <div class="label">ML Confidence</div>
+            <div class="value safe">97.3%</div>
+          </div>
+          <div class="result-card">
+            <div class="label">Domain Age</div>
+            <div class="value warn">2 days</div>
+          </div>
+        </div>
+        <div class="threat-bar" style="margin-top:1.2rem;">
+          <div class="threat-bar-label"><span>URL Suspicion Score</span><span style="color:var(--accent2)">87/100</span></div>
+          <div class="bar-track"><div class="bar-fill high"></div></div>
+        </div>
+        <div class="threat-bar" style="margin-top:0.7rem;">
+          <div class="threat-bar-label"><span>Domain Legitimacy</span><span style="color:#ffd700">38/100</span></div>
+          <div class="bar-track"><div class="bar-fill med"></div></div>
+        </div>
+        <div class="threat-bar" style="margin-top:0.7rem;">
+          <div class="threat-bar-label"><span>SSL Certificate Trust</span><span style="color:var(--accent3)">8/100</span></div>
+          <div class="bar-track"><div class="bar-fill low"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TICKER -->
+<div class="ticker">
+  <div class="ticker-track">
+    <div class="ticker-item">PHISHING ATTACKS <span>↑ 150%</span> SINCE 2022</div>
+    <div class="ticker-item">1 IN 99 EMAILS IS A PHISHING ATTACK</div>
+    <div class="ticker-item">AVG BREACH COST <span>$4.88M</span></div>
+    <div class="ticker-item">36% OF BREACHES INVOLVE PHISHING</div>
+    <div class="ticker-item">ML DETECTION ACCURACY <span>97%+</span></div>
+    <div class="ticker-item">REAL-TIME SCAN <span>&lt;200ms</span></div>
+    <!-- duplicate for seamless loop -->
+    <div class="ticker-item">PHISHING ATTACKS <span>↑ 150%</span> SINCE 2022</div>
+    <div class="ticker-item">1 IN 99 EMAILS IS A PHISHING ATTACK</div>
+    <div class="ticker-item">AVG BREACH COST <span>$4.88M</span></div>
+    <div class="ticker-item">36% OF BREACHES INVOLVE PHISHING</div>
+    <div class="ticker-item">ML DETECTION ACCURACY <span>97%+</span></div>
+    <div class="ticker-item">REAL-TIME SCAN <span>&lt;200ms</span></div>
+  </div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="section-label">Process</div>
+  <h2>Three steps to<br>total phishing immunity</h2>
+  <p class="section-sub">PhishGuard AI works silently in the background, analysing every page you visit and alerting you before harm is done.</p>
+
+  <div class="steps reveal">
+    <div class="step">
+      <div class="step-num">// STEP 01</div>
+      <div class="step-icon">🔍</div>
+      <h3>Real-Time URL Analysis</h3>
+      <p>Every URL you visit is instantly scanned. Our ML model extracts over 30 features including domain age, HTTPS validity, URL structure, and lexical patterns.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">// STEP 02</div>
+      <div class="step-icon">🧠</div>
+      <h3>ML Classification Engine</h3>
+      <p>A trained Random Forest / neural classifier processes extracted features and outputs a phishing probability score in milliseconds — no cloud latency.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">// STEP 03</div>
+      <div class="step-icon">🛡️</div>
+      <h3>Alert & Educate</h3>
+      <p>Suspicious pages trigger a clear, actionable warning. Users learn why the site was flagged — building cyber awareness, not just blocking silently.</p>
+    </div>
+  </div>
+</section>
+
+<!-- THREAT STATS -->
+<div id="threat">
+  <div class="threat-inner reveal">
+    <div>
+      <div class="section-label">Why It Matters</div>
+      <h2>Phishing is the #1 cyber threat vector</h2>
+      <p style="color:var(--muted);line-height:1.7;margin-top:1rem;">
+        Traditional blocklists are reactive — they only catch known threats. Our proactive ML model detects <strong style="color:var(--text)">never-before-seen</strong> phishing pages by understanding the anatomy of deception, not just a list of known bad URLs.
+      </p>
+      <ul class="tech-list" style="margin-top:1.5rem;">
+        <li>Works on zero-day phishing domains</li>
+        <li>No reliance on slow, stale blocklists</li>
+        <li>Lightweight — runs fully in-browser</li>
+        <li>Privacy-first — no URL data sent to servers</li>
+      </ul>
+    </div>
+    <div class="threat-stats-grid">
+      <div class="stat-box">
+        <span class="stat-number red">3.4B</span>
+        <div class="stat-label">Phishing emails sent per day</div>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">97%</span>
+        <div class="stat-label">Detection accuracy</div>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number red">90%</span>
+        <div class="stat-label">Of data breaches start with phishing</div>
+      </div>
+      <div class="stat-box">
+        <span class="stat-number">&lt;200ms</span>
+        <div class="stat-label">Average scan time</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-label">Capabilities</div>
+  <h2>Everything you need to stay protected</h2>
+  <p class="section-sub">Built for everyday users, students, and organisations who want real-time defence without complexity.</p>
+
+  <div class="features-grid reveal">
+    <div class="feature">
+      <div class="feature-icon">⚡</div>
+      <div>
+        <h3>Instant Page Scanning</h3>
+        <p>Every page load triggers automatic analysis. No manual action needed — protection is always on.</p>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📊</div>
+      <div>
+        <h3>Visual Threat Reports</h3>
+        <p>Understand exactly why a page was flagged with clear breakdowns of suspicious signals.</p>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🔒</div>
+      <div>
+        <h3>HTTPS & Certificate Check</h3>
+        <p>Validates SSL certificates, checks domain age, and identifies certificate anomalies.</p>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🌐</div>
+      <div>
+        <h3>URL Feature Extraction</h3>
+        <p>Analyses 30+ URL features: length, special characters, IP-based domains, subdomains, typosquatting patterns.</p>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🎓</div>
+      <div>
+        <h3>Awareness Education</h3>
+        <p>Each warning teaches users what to look for — turning every alert into a learning moment.</p>
+      </div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🛡️</div>
+      <div>
+        <h3>Privacy First</h3>
+        <p>All ML inference runs locally in the browser. No browsing data leaves your device.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ML ENGINE -->
+<div id="ml">
+  <div class="ml-inner reveal">
+    <div>
+      <div class="section-label">Under the Hood</div>
+      <h2>ML-powered,<br>not blocklist-dependent</h2>
+      <p style="color:var(--muted);line-height:1.7;margin-top:0.8rem;">
+        The core engine extracts lexical, host-based, and content-based features from every URL, running them through a trained classification model deployed directly in the extension.
+      </p>
+      <ul class="tech-list">
+        <li>Random Forest / Gradient Boosting classifier</li>
+        <li>30+ hand-engineered URL features</li>
+        <li>Trained on curated phishing + legitimate datasets</li>
+        <li>Continuous model improvement pipeline</li>
+        <li>Python (scikit-learn) model exported to JS runtime</li>
+        <li>Chrome Extension Manifest V3 compatible</li>
+      </ul>
+    </div>
+    <div class="ml-visual">
+      <div class="ml-header">
+        <span>// FEATURE IMPORTANCE</span>
+        <span style="color:var(--accent)">MODEL v2.1</span>
+      </div>
+      <div class="ml-row">
+        <span class="ml-feature-name">url_length</span>
+        <div class="ml-score">
+          <div class="ml-bar"><div class="ml-bar-fill" style="width:90%;background:var(--accent2);"></div></div>
+          <span style="color:var(--accent2)">0.91</span>
+        </div>
+      </div>
+      <div class="ml-row">
+        <span class="ml-feature-name">having_@_symbol</span>
+        <div class="ml-score">
+          <div class="ml-bar"><div class="ml-bar-fill" style="width:82%;background:var(--accent2);"></div></div>
+          <span style="color:var(--accent2)">0.83</span>
+        </div>
+      </div>
+      <div class="ml-row">
+        <span class="ml-feature-name">ssl_final_state</span>
+        <div class="ml-score">
+          <div class="ml-bar"><div class="ml-bar-fill" style="width:76%;background:#ffd700;"></div></div>
+          <span style="color:#ffd700">0.77</span>
+        </div>
+      </div>
+      <div class="ml-row">
+        <span class="ml-feature-name">domain_age</span>
+        <div class="ml-score">
+          <div class="ml-bar"><div class="ml-bar-fill" style="width:71%;background:#ffd700;"></div></div>
+          <span style="color:#ffd700">0.72</span>
+        </div>
+      </div>
+      <div class="ml-row">
+        <span class="ml-feature-name">subdomain_level</span>
+        <div class="ml-score">
+          <div class="ml-bar"><div class="ml-bar-fill" style="width:65%;background:var(--accent);"></div></div>
+          <span style="color:var(--accent)">0.66</span>
+        </div>
+      </div>
+      <div class="ml-row">
+        <span class="ml-feature-name">ip_address</span>
+        <div class="ml-score">
+          <div class="ml-bar"><div class="ml-bar-fill" style="width:58%;background:var(--accent);"></div></div>
+          <span style="color:var(--accent)">0.59</span>
+        </div>
+      </div>
+      <div class="ml-row">
+        <span class="ml-feature-name">prefix_suffix</span>
+        <div class="ml-score">
+          <div class="ml-bar"><div class="ml-bar-fill" style="width:52%;background:var(--accent3);"></div></div>
+          <span style="color:var(--accent3)">0.53</span>
+        </div>
+      </div>
+      <div class="model-badge">
+        <span>Verdict: PHISHING</span>
+        <span class="confidence">97.3% confidence</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<section id="cta">
+  <div class="section-label" style="justify-content:center;">Get Protected</div>
+  <h2>Start defending yourself today</h2>
+  <p>PhishGuard AI is open source, free, and built for everyone. Install the Chrome extension and join the fight against phishing.</p>
+  <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+    <a href="https://github.com/phaneendrakumarbabu/ml-based-phishing-awareness-defence-extension" target="_blank" class="btn-primary">⬇ Install from GitHub</a>
+    <a href="https://github.com/phaneendrakumarbabu/ml-based-phishing-awareness-defence-extension" target="_blank" class="btn-ghost">⭐ Star on GitHub</a>
+  </div>
+
+  <div class="contact-grid">
+    <a href="https://github.com/phaneendrakumarbabu/ml-based-phishing-awareness-defence-extension" target="_blank" class="contact-item">
+      <span class="icon">⌘</span> GitHub Repository
+    </a>
+    <a href="mailto:phaneendrakumarbabu@example.com" class="contact-item">
+      <span class="icon">✉</span> phaneendrakumarbabu@gmail.com
+    </a>
+    <a href="#how" class="contact-item">
+      <span class="icon">📖</span> Documentation
+    </a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p>© 2025 PhishGuard AI — ML-Based Phishing Awareness Defence Extension</p>
+  <p>Built with 🛡️ by Phaneendra Kumar Babu</p>
+</footer>
+
+<script>
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+  }, { threshold: 0.15 });
+  reveals.forEach(r => observer.observe(r));
+
+  // Animated counter
+  function animateCount(el, target, suffix = '') {
+    let start = 0;
+    const duration = 2000;
+    const step = (timestamp) => {
+      if (!start) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      const val = Math.floor(progress * target);
+      el.textContent = val.toLocaleString() + suffix;
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  // Typing URL effect
+  const urls = [
+    'http://secure-paypa1.verify-account.xyz/login',
+    'https://amazon-security-alert.tk/update',
+    'http://192.168.1.1.login.info/bank',
+    'https://netflix-billing-update.cf/confirm'
+  ];
+  let urlIndex = 0;
+  function cycleUrl() {
+    urlIndex = (urlIndex + 1) % urls.length;
+    const el = document.getElementById('url-text');
+    el.style.opacity = '0';
+    setTimeout(() => { el.textContent = urls[urlIndex]; el.style.opacity = '1'; }, 300);
+  }
+  setInterval(cycleUrl, 3500);
+</script>
+</body>
+</html>
